@@ -1,11 +1,11 @@
 #!/bin/bash          
 
 # Executable
-directory=pwd #current working directory
+directory="/home/pjo010/inf-3200-assignment1/precode/" #current working directory
 executable="node.py";
 
 # Lists of nodes
-nodes=( "compute-1-1" "compute-1-2" "compute-1-3")
+nodes=( "compute-11-1" "compute-11-2" "compute-11-3")
 
 # Stop any running processes
 for node in "${nodes[@]}"
@@ -17,7 +17,7 @@ done
 for node in "${nodes[@]}"
 do
   echo "Booting node" $node
-  nohup ssh $node bash -c "'python $directory$executable'"  > /dev/null 2>&1 &
+  nohup ssh $node bash -c "'python $directory$executable grep da * 2> grep_errors$node.txt'"  > /dev/null 2>&1 &
 done
 
 # Wait/Run benchmarks

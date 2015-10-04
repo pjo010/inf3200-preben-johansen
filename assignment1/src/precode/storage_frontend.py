@@ -7,9 +7,17 @@ import socket
 import httplib
 import random
 import string
+import logging
+
+logging.basicConfig(filename='frontend.log',level=logging.DEBUG, 
+    format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+#logging.debug('This message should go to the log file')
+#logging.info('So should this')
+#logging.warning('And this, too')
 
 MAX_CONTENT_LENGHT = 1024		# Maximum length of the content of the http request (1 kilobyte)
 MAX_STORAGE_SIZE = 104857600	# Maximum total storage allowed (100 megabytes)
+PORTNR = 8009
 
 storageBackendNodes = list()
 httpdServeRequests = True
@@ -17,28 +25,86 @@ httpdServeRequests = True
 class StorageServerFrontend:
 	
 	def __init__(self):
-		self.map = dict()		# (Remove this) Dictionary which holds the key/value pairs
 		self.size = 0
-	
+		self.nodeSent = 0
+		self.numNodes = len(storageBackendNodes)
+
+		#send nodelist to backend nodes
+	def handleNodeList(self):
+		for recvnodes in storageBackendNodes:
+			for sendnodes in storageBackendNodes:
+				try:
+					conn = httplib.HTTPConnection(recvnodes, PORTNR)
+					conn.request("PUT", sendnodes, str(len(storageBackendNodes)))
+					response = conn.getresponse()
+					if response.status != 200:
+						logging.error(response.status)
+				except:
+					logging.error('Failed to send PUT request')					
+		self.nodeSent = 1
+		return True
+		#Returns the size each node
+	def sizeReturn(self):
+		for recvnodes in storageBackendNodes:
+			try:
+				conn = httplib.HTTPConnection(recvnodes, PORTNR)
+				conn.request("GET", 'size', 'value')
+				response = conn.getresponse()
+				if response.status != 200:
+					logging.error(response.status)
+				value = response.read()
+				print value
+				logging.debug('Has sent node: %s and value: %s', nodeSend, str(len(storageBackendNodes)))
+			except:
+				logging.error('Failed to send PUT request')					
+		return True
+
 	def sendGET(self, key):
+		if key == 'size':
+			#Size return
+			self.sizeReturn()
+			return True
+		if self.nodeSent == 0:
+			logging.info('Nodelist not sent')
+			self.handleNodeList()
 		node = random.choice(storageBackendNodes)
-		
-		#	TODO:
-		# 	Send a GET request to the node for the give key
-		#	return the data
-		
-		# (Remove this) Returns the value given the key
-		return self.map.get(key)
+	
+		try:
+			conn = httplib.HTTPConnection(node, PORTNR)
+			conn.request("GET", key)
+			response = conn.getresponse()
+			if response.status != 200:
+				print response.reason
+				return False
+			value = response.read()
+		except:
+			print "Unable to send GET request"
+			logging.debug('Unable to send Get request')
+			return False
+
+		return value
 		
 	def sendPUT(self, key, value, size):
+		#Send node list if not sent
+		if self.nodeSent == 0:
+			self.handleNodeList()
 		self.size = self.size + size
 		node = random.choice(storageBackendNodes)
 
-		#	TODO:
-		# 	Send a PUT request to the node with the key/value pair
-		
-		# (Remove this) Stores the key/value pair
-		self.map[key] = value
+	
+		try:
+			conn = httplib.HTTPConnection(node, PORTNR)
+			conn.request("PUT", key, value)
+			response = conn.getresponse()
+			if response.status != 200:
+				logging.error(response.status)
+				return False
+		except:
+			return False
+		return True
+
+
+
 
 
 class FrontendHttpHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -47,6 +113,8 @@ class FrontendHttpHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 	
 	# Returns the 
 	def do_GET(self):
+
+		logging.debug('Do_Get_Path: %s', self.path)
 		key = self.path
 		value = frontend.sendGET(key)
 		
@@ -63,8 +131,9 @@ class FrontendHttpHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.wfile.write(value)
 		
 	def do_PUT(self):
+
 		contentLength = int(self.headers['Content-Length'])
-		
+		logging.debug('Do_Put_Path: %s', self.path)
 		if contentLength <= 0 or contentLength > MAX_CONTENT_LENGHT:
 			self.sendErrorResponse(400, "Content body to large")
 			return
@@ -161,7 +230,7 @@ class StorageServerTest:
 		print "GET(key, value):", key, value
 		
 		try:
-			conn = httplib.HTTPConnection("localhost", self.portnumber)
+			conn = httplib.HTTPConnection("localhost", PORTNR)
 			conn.request("GET", key)
 			response = conn.getresponse()
 			if response.status != 200:
@@ -183,7 +252,7 @@ class StorageServerTest:
 		print "PUT(key, value):", key, value
 		
 		try:
-			conn = httplib.HTTPConnection("localhost", self.portnumber)
+			conn = httplib.HTTPConnection("localhost", PORTNR)
 			conn.request("PUT", key, value)
 			response = conn.getresponse()
 			
@@ -195,7 +264,7 @@ class StorageServerTest:
 if __name__ == '__main__':
 	
 	run_tests = False
-	httpserver_port = 8000
+	httpserver_port = PORTNR
 	
 	try:
 		optlist, args = getopt.getopt(sys.argv[1:], 'x', ['runtests', 'port='])
@@ -211,17 +280,18 @@ if __name__ == '__main__':
 		if opt in ("-runtests", "--runtests"):
 			run_tests = True
 		elif opt in ("-port", "--port"):
-			httpserver_port = int(arg)
+			httpserver_port = PORTNR
 			
 	# Nodelist
 	for node in args:
 		storageBackendNodes.append(node)
 		print "Added", node, "to the list of nodes"
-	
+	print len(storageBackendNodes)
 	# Start the webserver which handles incomming requests
 	try:
 		httpd = FrontendHTTPServer(("",httpserver_port), FrontendHttpHandler)
 		server_thread = threading.Thread(target = httpd.serve)
+		#The entire Python program exits when no alive non-daemon threads are left
 		server_thread.daemon = True
 		server_thread.start()
 		

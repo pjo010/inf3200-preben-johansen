@@ -167,7 +167,7 @@ class BackendStorageHandler:
         if key == self.previousKey:
             logging.debug('Has searched every node and found none')
         #return size
-        if key == '/size':
+        if key == 'size':
             return self.size
         #Looks for value, if not found, look in the next
         value = self.backmap.get(key)
