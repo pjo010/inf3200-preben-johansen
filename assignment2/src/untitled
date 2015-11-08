@@ -1,0 +1,57 @@
+        self.hashmap = dict()
+        self.maphash = dict()
+
+        self.nextNode = None        #
+        self.ownNode = None         #
+
+        self.ownHash = None
+        self.previousKey = None
+        self.ownIndex = None
+    #Helper functions to find hashes and nodes
+    def nodeToHash(self, node):
+        value = self.hashmap[node]
+        logging.debug('node: %s, return: %s', node, value)
+        return value
+
+    def hashToNode(self, hashedNode):
+        value = self.maphash[hashedNode]
+        return value
+    def handleNodes(self):
+
+        if self.expectedNodes is len(nodeList):
+
+
+            self.hashAndSort()
+            #Need to address the adresses
+        
+        
+            self.ownIndex = hashNodes.index(self.nodeToHash(self.ownNode))
+            logging.debug(self.ownIndex)
+            if self.ownIndex == self.expectedNodes - 1:
+                self.nextHash = hashNodes[0]
+                self.nextNode = self.hashToNode(self.nextHash)
+                self.nextHash = int(self.nextHash, 16)
+            else:
+                self.nextHash = hashNodes[self.ownIndex + 1]
+                self.nextNode = self.hashToNode(self.nextHash)
+                self.nextHash = int(self.nextHash, 16)
+            #Hashing the adress
+
+            self.ownHash = int(self.nodeToHash(self.ownNode), 16)
+
+            self.nodeListReady = True
+
+    def hashAndSort(self):
+        self.ownNode = socket.gethostname()
+        self.ownNode = self.ownNode[:-6]
+        logging.debug(self.ownNode)
+        for nodes in nodeList:
+            tempHashObj = hashlib.sha1(nodes)
+            newHash = tempHashObj.hexdigest()
+            logging.debug('Hash: %s, node: %s', newHash, nodes)
+            hashNodes.append(newHash)
+            self.hashmap[nodes] = newHash
+            self.maphash[newHash] = nodes
+        hashNodes.sort()
+        for hashed in hashNodes:
+            logging.debug(self.hashToNode(hashed))
